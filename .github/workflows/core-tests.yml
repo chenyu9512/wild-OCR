@@ -1,0 +1,13 @@
+name: WildOCR Core Tests
+on:
+  push:
+  pull_request:
+jobs:
+  core:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test platform-independent core
+        run: swift test
+      - name: Check Swift package description
+        run: swift package dump-package >/dev/null
