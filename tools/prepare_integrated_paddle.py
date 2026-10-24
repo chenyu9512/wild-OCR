@@ -10,8 +10,11 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = "b03f46425e8ff4442b268ce449e3eef758146cd4"
-if len(sys.argv) != 2:
-    raise SystemExit("usage: prepare_integrated_paddle.py /path/to/PaddleOCR-upstream")
+if len(sys.argv) not in (2, 3):
+    raise SystemExit("usage: prepare_integrated_paddle.py /path/to/PaddleOCR-upstream [v5-mobile|v6-small]")
+preset = sys.argv[2] if len(sys.argv) == 3 else "v5-mobile"
+if preset not in ("v5-mobile", "v6-small"):
+    raise SystemExit("Unsupported model preset")
 repo = Path(sys.argv[1]).resolve()
 if not (repo / "deploy/ios_demo/PaddleOCRDemo").is_dir():
     raise SystemExit("Missing official PaddleOCR iOS source")
@@ -79,4 +82,5 @@ dest = ROOT / "ios/WildOCRApp/Models"
 if dest.exists():
     shutil.rmtree(dest)
 shutil.copytree(models, dest)
-print("PaddleOCR inference sources, ObjC++ bridge and real models prepared")
+(dest / "preset.txt").write_text(preset + "\n", encoding="utf-8")
+print("PaddleOCR inference sources and real model prepared:", preset)
