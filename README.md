@@ -1,28 +1,17 @@
 # wild-OCR
 
-**Universal, offline-first, multilingual OCR foundation for iPhone.**
+**Independent offline-first iPhone multilingual OCR project.** Not a GameLingoAI fork.
 
-Independent Swift Package; not a fork of GameLingoAI. The existing GameLingoAI main and ML Kit experiment branches remain independent.
+## iPhone App 0.2.0
 
-## Current capabilities
+The `ios/WildOCRApp` app includes offline native Apple Vision OCR using PhotosPicker or Files, Fast/Accurate selection, automatic or explicit language hints, text copy, detected script and per-line positions, and actual device OCR P50/P95 timing.
 
-- Universal OCR block representation with normalized coordinates, reading order, script and optional confidence.
-- Unicode script classification for Han, kana, hangul, Latin, Cyrillic, Arabic, Devanagari, Thai, Greek and Hebrew. Script heuristics **do not** guarantee language detection.
-- Installed-model-aware routing with Apple Vision fallback, local ROI-change gate, and privacy-safe P50/P95 measurement.
-- Apple Vision recognition for iOS using VNRecognizeTextRequest and CVPixelBuffer.
-- PaddleOCR integration interface only. **Paddle models, ONNX Runtime, iOS build and benchmarks have NOT yet been integrated or verified.**
-- No game capture, translation, PiP, cloud OCR, paid API or persistent screenshots in this library.
+It also includes a **verified local PaddleOCR model manager** (manifest + SHA-256 check) and a Vision vs PaddleOCR comparison screen with exact-image matching and ground-truth character error rate. The Paddle runtime is **not yet running inside this app**; its models remain inactive even after verification. To benchmark real Paddle inference, a second Codemagic workflow builds PaddleOCR's **official standalone iOS demo** with ONNX Runtime.
 
-## Swift Package
+## Build
 
-Requires Swift 5.9+, iOS 17+ or macOS 13+; platform-independent logic can also be tested on Linux.
+Use Codemagic `ios-wild-ocr-unsigned` to build `wild-OCR-0.2.0-unsigned.ipa`, then sign for iPhone. Optional `ios-paddle-upstream-unsigned` builds the independent PaddleOCR sample IPA. Native iOS build status must be verified before claiming a working build.
 
-Run: `swift test`
+The Swift Package remains independently testable with `swift test`; core OCR structures, script classification, model routing, timing, manifest validation and CER comparison have unit tests.
 
-Main modules:
-
-- `WildOCRCore`: data models, Unicode script heuristics, routing, change detection, metrics.
-- `WildOCRAppleVision`: native on-device image OCR.
-- `WildOCRPaddleBridge`: placeholder API for verified future PaddleOCR model integration.
-
-See `docs/ARCHITECTURE.md`. Contributions must preserve offline-first behavior, language accuracy and performance measurement before promising additional language support.
+See [iOS build & test guide](docs/IOS_APP.md) and [architecture](docs/ARCHITECTURE.md). No paid OCR API, cloud image upload or automatic model download is performed.

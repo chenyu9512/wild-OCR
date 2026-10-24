@@ -1,0 +1,16 @@
+name: iOS app compile
+on:
+  push:
+  pull_request:
+jobs:
+  iphone:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+      - name: Compile app for generic iPhone
+        run: |
+          xcodebuild -project WildOCR.xcodeproj -scheme WildOCR             -configuration Debug -sdk iphoneos -destination 'generic/platform=iOS'             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO             CODE_SIGN_IDENTITY="" build

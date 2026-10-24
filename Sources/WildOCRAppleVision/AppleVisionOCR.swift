@@ -3,55 +3,67 @@ import Foundation
 import Vision
 import CoreVideo
 import ImageIO
+#if !WILD_OCR_EMBEDDED
 import WildOCRCore
+#endif
 
-/// Real iPhone OCR implementation. Keep it on an OCR worker queue.
-/// A model cannot recognize characters it has no Vision language support for;
-/// actual availability is queried from the active iOS revision.
+/// On-device native OCR; run on a background worker.
 public enum AppleVisionOCR {
     public static let engineID = "apple-vision"
 
     @available(iOS 16.0, macOS 13.0, *)
-    public static func recognize(_ pixelBuffer: CVPixelBuffer,
+    public static func recognize(_ buffer: CVPixelBuffer,
                                  orientation: CGImagePropertyOrientation = .up,
                                  region: OCRRegion = .full,
                                  languageHints: [String] = [],
                                  quality: OCRQuality = .fast) throws -> [OCRBlock] {
+        try run(VNImageRequestHandler(cvPixelBuffer: buffer,
+                                    orientation: orientation, options: [:]),
+                region: region, languageHints: languageHints, quality: quality)
+    }
+
+    @available(iOS 16.0, macOS 13.0, *)
+    public static func recognize(_ image: CGImage,
+                                 orientation: CGImagePropertyOrientation = .up,
+                                 region: OCRRegion = .full,
+                                 languageHints: [String] = [],
+                                 quality: OCRQuality = .fast) throws -> [OCRBlock] {
+        try run(VNImageRequestHandler(cgImage: image,
+                                    orientation: orientation, options: [:]),
+                region: region, languageHints: languageHints, quality: quality)
+    }
+
+    @available(iOS 16.0, macOS 13.0, *)
+    private static func run(_ handler: VNImageRequestHandler,
+                            region: OCRRegion, languageHints: [String],
+                            quality: OCRQuality) throws -> [OCRBlock] {
         guard region.isValid else { throw OCREngineError.invalidRegion }
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = quality == .fast ? .fast : .accurate
-        request.usesLanguageCorrection = true
-        request.automaticallyDetectsLanguage = languageHints.isEmpty
-        request.regionOfInterest = CGRect(x: region.x, y: region.y,
-                                          width: region.width, height: region.height)
+        let req = VNRecognizeTextRequest()
+        req.recognitionLevel = quality == .fast ? .fast : .accurate
+        req.automaticallyDetectsLanguage = languageHints.isEmpty
+        req.usesLanguageCorrection = true
+        req.regionOfInterest = CGRect(x: region.x, y: region.y,
+                                      width: region.width, height: region.height)
         if !languageHints.isEmpty {
-            let supported = try request.supportedRecognitionLanguages()
-            let available = languageHints.filter(supported.contains)
-            if !available.isEmpty { request.recognitionLanguages = available }
-            else { request.automaticallyDetectsLanguage = true }
+            let supported = try req.supportedRecognitionLanguages()
+            let selected = languageHints.filter(supported.contains)
+            if selected.isEmpty { req.automaticallyDetectsLanguage = true }
+            else { req.recognitionLanguages = selected }
         }
-        try VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
-                                  orientation: orientation, options: [:]).perform([request])
-        let observed = (request.results ?? []).compactMap { item -> (text: String, rect: CGRect, confidence: Double)? in
-            guard let best = item.topCandidates(1).first else { return nil }
-            let text = best.string.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { return nil }
-            return (text, item.boundingBox, Double(best.confidence))
+        try handler.perform([req])
+        let lines = (req.results ?? []).compactMap { ob -> (String, CGRect, Double)? in
+            guard let candidate = ob.topCandidates(1).first else { return nil }
+            return (candidate.string, ob.boundingBox, Double(candidate.confidence))
         }.sorted {
-            abs($0.rect.midY - $1.rect.midY) < 0.02
-                ? $0.rect.minX < $1.rect.minX : $0.rect.midY > $1.rect.midY
+            abs($0.1.midY - $1.1.midY) < 0.02 ? $0.1.minX < $1.1.minX : $0.1.midY > $1.1.midY
         }
-        return observed.enumerated().map { index, line in
-            let script = ScriptClassifier.classify(line.text)
-            return OCRBlock(text: line.text,
-                            region: OCRRegion(x: Double(line.rect.minX),
-                                              y: Double(line.rect.minY),
-                                              width: Double(line.rect.width),
-                                              height: Double(line.rect.height)),
-                            script: script,
-                            languageHint: ScriptClassifier.strongLanguageHint(line.text),
-                            confidence: line.confidence,
-                            engineID: engineID, readingOrder: index)
+        return lines.enumerated().map { i, ob in
+            OCRBlock(text: ob.0,
+                     region: OCRRegion(x: Double(ob.1.minX), y: Double(ob.1.minY),
+                         width: Double(ob.1.width), height: Double(ob.1.height)),
+                     script: ScriptClassifier.classify(ob.0),
+                     languageHint: ScriptClassifier.strongLanguageHint(ob.0),
+                     confidence: ob.2, engineID: engineID, readingOrder: i)
         }
     }
 }

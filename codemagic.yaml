@@ -1,0 +1,98 @@
+workflows:
+  ios-wild-ocr-unsigned:
+    name: wild-OCR iPhone Vision OCR — unsigned
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: '27.1'
+    scripts:
+      - name: Validate package and generate Xcode project
+        script: |
+          set -e
+          swift test
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          xcodegen generate --spec project.yml
+      - name: Compile unsigned iPhone app
+        script: |
+          set -e
+          mkdir -p "$CM_BUILD_DIR/artifacts"
+          LOG="$CM_BUILD_DIR/artifacts/wildOCR-build.log"
+          if xcodebuild -project WildOCR.xcodeproj -scheme WildOCR \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$CM_BUILD_DIR/Build" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > "$LOG" 2>&1; then
+            tail -n 30 "$LOG"
+          else
+            grep -n -E 'error:|no such module|BUILD FAILED' "$LOG" | head -n 80 || true
+            tail -n 50 "$LOG"
+            exit 65
+          fi
+      - name: Package unsigned IPA
+        script: |
+          set -e
+          APP="$CM_BUILD_DIR/Build/Build/Products/Release-iphoneos/WildOCR.app"
+          test -d "$APP"
+          mkdir -p "$CM_BUILD_DIR/artifacts/Payload"
+          cp -R "$APP" "$CM_BUILD_DIR/artifacts/Payload/WildOCR.app"
+          (cd "$CM_BUILD_DIR/artifacts" && zip -qr wild-OCR-0.2.0-unsigned.ipa Payload && rm -rf Payload)
+    artifacts:
+      - artifacts/wild-OCR-0.2.0-unsigned.ipa
+      - artifacts/wildOCR-build.log
+
+  ios-paddle-upstream-unsigned:
+    name: PaddleOCR official ONNX Runtime iOS demo — separate experiment
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      xcode: '27.1'
+      cocoapods: default
+    scripts:
+      - name: Fetch version-pinned PaddleOCR and official ONNX models
+        script: |
+          set -e
+          git clone --depth 1 --branch v3.7.0 --filter=blob:none \
+            https://github.com/PaddlePaddle/PaddleOCR.git "$CM_BUILD_DIR/PaddleOCR-upstream"
+          cd "$CM_BUILD_DIR/PaddleOCR-upstream"
+          test "$(git rev-parse HEAD)" = 'b03f46425e8ff4442b268ce449e3eef758146cd4' || {
+            echo 'Pinned PaddleOCR upstream version changed'
+            exit 1
+          }
+          cd deploy/ios_demo
+          pod install
+          MODEL="PP-OCRv5_mobile"
+          if [ -n "$PADDLE_MODEL_PRESET" ]; then MODEL="$PADDLE_MODEL_PRESET"; fi
+          case "$MODEL" in
+            PP-OCRv5_mobile|PP-OCRv6_small|PP-OCRv6_tiny) ;;
+            *) echo "Invalid model preset"; exit 2 ;;
+          esac
+          bash scripts/fetch_ios_demo_models.sh "$MODEL"
+      - name: Build official PaddleOCR iPhone demo
+        script: |
+          set -e
+          mkdir -p "$CM_BUILD_DIR/artifacts"
+          DEMO="$CM_BUILD_DIR/PaddleOCR-upstream/deploy/ios_demo"
+          LOG="$CM_BUILD_DIR/artifacts/paddle-build.log"
+          if xcodebuild -workspace "$DEMO/PaddleOCRDemo.xcworkspace" \
+            -scheme PaddleOCRDemo -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$CM_BUILD_DIR/PaddleBuild" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > "$LOG" 2>&1; then
+            tail -n 30 "$LOG"
+          else
+            grep -n -E 'error:|BUILD FAILED' "$LOG" | head -n 80 || true
+            tail -n 50 "$LOG"
+            exit 65
+          fi
+      - name: Package separate PaddleOCR IPA
+        script: |
+          set -e
+          APP="$CM_BUILD_DIR/PaddleBuild/Build/Products/Release-iphoneos/PaddleOCRDemo.app"
+          test -d "$APP"
+          mkdir -p "$CM_BUILD_DIR/artifacts/Payload"
+          cp -R "$APP" "$CM_BUILD_DIR/artifacts/Payload/PaddleOCRDemo.app"
+          (cd "$CM_BUILD_DIR/artifacts" && zip -qr wild-PaddleOCR-upstream-unsigned.ipa Payload && rm -rf Payload)
+    artifacts:
+      - artifacts/wild-PaddleOCR-upstream-unsigned.ipa
+      - artifacts/paddle-build.log
