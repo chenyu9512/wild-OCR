@@ -112,8 +112,9 @@ workflows:
             https://github.com/PaddlePaddle/PaddleOCR.git "$CM_BUILD_DIR/PaddleOCR-upstream"
           test "$(git -C "$CM_BUILD_DIR/PaddleOCR-upstream" rev-parse HEAD)" = \
             'b03f46425e8ff4442b268ce449e3eef758146cd4'
+          PRESET="${PADDLE_MODEL_PRESET:-v5-mobile}"
           python3 tools/fetch_official_paddle_onnx.py \
-            "$CM_BUILD_DIR/PaddleOCR-upstream/deploy/ios_demo/PaddleOCRDemo/Models"
+            "$CM_BUILD_DIR/PaddleOCR-upstream/deploy/ios_demo/PaddleOCRDemo/Models" "$PRESET"
           python3 tools/prepare_integrated_paddle.py "$CM_BUILD_DIR/PaddleOCR-upstream"
           command -v xcodegen >/dev/null || brew install xcodegen
           xcodegen generate --spec project.paddle.yml
