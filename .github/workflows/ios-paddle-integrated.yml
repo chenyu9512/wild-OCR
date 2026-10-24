@@ -1,0 +1,56 @@
+name: iOS PaddleOCR integrated build
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ios-paddle-integrated.yml'
+      - 'tools/prepare_integrated_paddle.py'
+      - 'project.paddle.yml'
+      - 'Podfile.paddle'
+      - 'ios/WildOCRApp/WildPaddleRuntime.swift'
+jobs:
+  integrated:
+    runs-on: macos-15
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen and CocoaPods
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          command -v pod >/dev/null || brew install cocoapods
+      - name: Fetch pinned PaddleOCR iOS engine and real ONNX models
+        run: |
+          git clone --depth 1 --filter=blob:none --branch v3.7.0 \
+            https://github.com/PaddlePaddle/PaddleOCR.git "$RUNNER_TEMP/PaddleOCR"
+          test "$(git -C "$RUNNER_TEMP/PaddleOCR" rev-parse HEAD)" = \
+            'b03f46425e8ff4442b268ce449e3eef758146cd4'
+          (cd "$RUNNER_TEMP/PaddleOCR/deploy/ios_demo" &&
+             bash scripts/fetch_ios_demo_models.sh PP-OCRv5_mobile)
+          python3 tools/prepare_integrated_paddle.py "$RUNNER_TEMP/PaddleOCR"
+      - name: Generate native Xcode workspace
+        run: |
+          xcodegen generate --spec project.paddle.yml
+          cp Podfile.paddle Podfile
+          pod install
+      - name: Compile actual in-app PaddleOCR
+        run: |
+          xcodebuild -workspace WildOCR.xcworkspace -scheme WildOCR \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/WildPaddleBuild" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+      - name: Package experimental unsigned IPA
+        run: |
+          APP="$RUNNER_TEMP/WildPaddleBuild/Build/Products/Release-iphoneos/WildOCR.app"
+          test -d "$APP"
+          test -d "$APP/Models/det"
+          test -d "$APP/Models/rec"
+          mkdir -p /tmp/WildPaddlePackage/Payload
+          cp -R "$APP" /tmp/WildPaddlePackage/Payload/WildOCR.app
+          (cd /tmp/WildPaddlePackage &&
+             zip -qr wild-OCR-0.4.0-Paddle-integrated-unsigned.ipa Payload)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wild-OCR-Paddle-integrated-unsigned-IPA
+          path: /tmp/WildPaddlePackage/wild-OCR-0.4.0-Paddle-integrated-unsigned.ipa
+          retention-days: 7
