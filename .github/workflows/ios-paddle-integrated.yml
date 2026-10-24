@@ -37,7 +37,7 @@ jobs:
           PRESET="${{ github.event.inputs.model_preset || 'v5-mobile' }}"
           python3 tools/fetch_official_paddle_onnx.py \
             "$RUNNER_TEMP/PaddleOCR/deploy/ios_demo/PaddleOCRDemo/Models" "$PRESET"
-          python3 tools/prepare_integrated_paddle.py "$RUNNER_TEMP/PaddleOCR"
+          python3 tools/prepare_integrated_paddle.py "$RUNNER_TEMP/PaddleOCR" "$PRESET"
       - name: Generate native Xcode workspace
         run: |
           xcodegen generate --spec project.paddle.yml
