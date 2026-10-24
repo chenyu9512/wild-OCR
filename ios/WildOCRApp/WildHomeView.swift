@@ -268,7 +268,7 @@ private struct WildScanScreen: View {
                 controlsPanel
                 NavigationLink {
                     WildBatchScreen(quality: vm.quality, language: vm.selectedLanguage,
-                                    region: vm.effectiveRegion)
+                                    region: vm.effectiveRegion, engineID: vm.engineID)
                 } label: {
                     Label("批量识别图片", systemImage: "square.stack.3d.down.right")
                         .font(.headline)
@@ -372,6 +372,17 @@ private struct WildScanScreen: View {
     private var controlsPanel: some View {
         WildSurface {
             WildSectionTitle(title: "识别参数", icon: "switch.2", detail: "按任务调整")
+            #if WILD_OCR_PADDLE
+            Picker("OCR 引擎", selection: $vm.engineID) {
+                Text("Apple Vision").tag("apple-vision")
+                Text("PaddleOCR ONNX (内置模型)").tag("paddle-onnx")
+            }
+            .pickerStyle(.segmented)
+            if vm.engineID == "paddle-onnx" {
+                Text("Paddle 实验版已包含真实本机模型。首次识别需要加载模型；质量选项只影响 Vision。")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            #endif
             Picker("识别质量", selection: $vm.quality) {
                 Text("快速").tag(OCRQuality.fast)
                 Text("高精度").tag(OCRQuality.accurate)
@@ -631,7 +642,11 @@ private struct WildModelsScreen: View {
                         .foregroundStyle(.secondary)
                     HStack {
                         WildStat(number: "\(vm.packs.count)", caption: "已验证模型包")
+                        #if WILD_OCR_PADDLE
+                        WildStat(number: "1", caption: "内置 Paddle 引擎")
+                        #else
                         WildStat(number: "0", caption: "Paddle 可运行引擎")
+                        #endif
                     }
                     if !vm.packs.isEmpty {
                         Divider()
@@ -720,7 +735,7 @@ private struct WildLabScreen: View {
                         title: vm.busy ? "测试正在运行" : "运行 5 次 Vision 识别",
                         icon: "play.fill",
                         isDisabled: vm.busy || vm.photo == nil,
-                        action: { vm.recognize(repetitions: 5) })
+                        action: { vm.runVisionBenchmark(repetitions: 5) })
                     if vm.photo == nil {
                         Text("请先在「识别」中导入一张图片。")
                             .font(.caption).foregroundStyle(.secondary)
@@ -759,6 +774,16 @@ private struct WildLabScreen: View {
                     }
                 }
 
+                #if WILD_OCR_PADDLE
+                WildSurface {
+                    WildSectionTitle(title: "真机双引擎 A/B", icon: "point.3.connected.trianglepath.dotted")
+                    Text("对同一张图片和区域，顺序运行 Vision 与内置 PaddleOCR，并记录各自耗时与识别结果。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Button("执行本机 Vision / Paddle 对照") { vm.runIntegratedAB() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(vm.busy || vm.photo == nil)
+                }
+                #endif
                 WildSurface {
                     WildSectionTitle(title: "PaddleOCR 外部对照", icon: "arrow.left.arrow.right")
                     WildPill(text: "外部数据，不是本机 Paddle 推理",
@@ -868,9 +893,13 @@ private struct WildSettingsScreen: View {
             }
             Section("当前能力") {
                 LabeledContent("通用 OCR", value: "Apple Vision")
+                #if WILD_OCR_PADDLE
+                LabeledContent("PaddleOCR", value: "真实本机 ONNX 推理（实验）")
+                #else
                 LabeledContent("PaddleOCR", value: "文件校验 / 尚未推理")
+                #endif
                 LabeledContent("对照实验", value: "Vision + 外部报告")
-                LabeledContent("版本", value: "0.3.0")
+                LabeledContent("版本", value: "0.4.0")
             }
             Section {
                 Text("wild-OCR 保持离线优先。新增模型只有完成推理集成、语言覆盖验证和真机基准后才会显示为可用。")
