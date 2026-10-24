@@ -55,6 +55,17 @@ final class WildAppState: ObservableObject {
     @Published var customRegion = OCRRegion(x: 0.06, y: 0.10, width: 0.88, height: 0.80)
     var effectiveRegion: OCRRegion { scanArea == .custom ? customRegion : scanArea.region }
     @Published var showBoxes = true
+    @Published private(set) var performanceSamples: [WildOCRPerformanceSample] = []
+    var performanceSummary: WildOCRPerformanceSummary? {
+        WildOCRPerformanceSummary(performanceSamples)
+    }
+    var performanceCSV: String {
+        let header = "time,engine,configuration,decode_ms,recognize_ms,total_ms,lines,thermal"
+        return ([header] + performanceSamples.map {
+            "\($0.timestamp.timeIntervalSince1970),\($0.engine),\($0.configuration),\($0.decodeMs),\($0.recognizeMs),\($0.totalMs),\($0.lines),\($0.thermal)"
+        }).joined(separator: "\n")
+    }
+    func clearPerformanceHistory() { performanceSamples.removeAll() }
     @Published var savedSessions: [WildOCRSessionEntry] = []
     @Published var text = ""
     @Published var rows: [OCRBlock] = []
@@ -89,6 +100,7 @@ final class WildAppState: ObservableObject {
         comparison = nil
         last = nil
         metricsByConfiguration.removeAll()
+        performanceSamples.removeAll()
         summary = "尚未测试"
         status = "已加载图片 · \(Int(photo.size.width)) × \(Int(photo.size.height))"
     }
@@ -105,7 +117,8 @@ final class WildAppState: ObservableObject {
         Task {
             do {
                 let results = try await Task.detached(priority: .userInitiated) {
-                    () throws -> [(blocks: [OCRBlock], time: Int)] in
+                    () throws -> [(blocks: [OCRBlock], time: Int, decodeMs: Int, totalMs: Int)] in
+                    let decodeStart = ProcessInfo.processInfo.systemUptime
                     guard let photo = UIImage(data: bytes), let image = photo.cgImage else {
                         throw NSError(domain: "wild.ocr", code: 1,
                                       userInfo: [NSLocalizedDescriptionKey: "图片解码失败"])
@@ -122,7 +135,9 @@ final class WildAppState: ObservableObject {
                     case .rightMirrored: orientation = .rightMirrored
                     @unknown default: orientation = .up
                     }
-                    var results: [(blocks: [OCRBlock], time: Int)] = []
+                    let decodeMs = max(0, Int(1000 *
+                        (ProcessInfo.processInfo.systemUptime - decodeStart)))
+                    var results: [(blocks: [OCRBlock], time: Int, decodeMs: Int, totalMs: Int)] = []
                     for _ in 0..<min(20, max(1, repetitions)) {
                         try Task.checkCancellation()
                         let start = ProcessInfo.processInfo.systemUptime
@@ -131,12 +146,34 @@ final class WildAppState: ObservableObject {
                             languageHints: languageHints, quality: selectedQuality)
                         let time = max(0, Int(1000 *
                             (ProcessInfo.processInfo.systemUptime - start)))
-                        results.append((blocks: blocks, time: time))
+                        results.append((blocks: blocks, time: time,
+                                        decodeMs: decodeMs,
+                                        totalMs: time + decodeMs))
                     }
                     return results
                 }.value
                 var measurements = metricsByConfiguration[statisticKey] ?? OCRMetrics()
                 for result in results { measurements.record(durationMs: result.time) }
+                let thermal = ProcessInfo.processInfo.thermalState
+                let thermalName: String
+                switch thermal {
+                case .nominal: thermalName = "nominal"
+                case .fair: thermalName = "fair"
+                case .serious: thermalName = "serious"
+                case .critical: thermalName = "critical"
+                @unknown default: thermalName = "unknown"
+                }
+                for result in results {
+                    performanceSamples.append(WildOCRPerformanceSample(
+                        engine: "apple-vision", configuration: selectedQuality.rawValue
+                            + "-" + scanArea.rawValue + "-" + selectedLanguage,
+                        decodeMs: result.decodeMs, recognizeMs: result.time,
+                        totalMs: result.totalMs, lines: result.blocks.count,
+                        thermal: thermalName))
+                }
+                if performanceSamples.count > 256 {
+                    performanceSamples.removeFirst(performanceSamples.count - 256)
+                }
                 metricsByConfiguration[statisticKey] = measurements
                 guard let value = results.last else { return }
                 rows = value.blocks
