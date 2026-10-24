@@ -728,6 +728,38 @@ private struct WildLabScreen: View {
                 }
 
                 WildSurface {
+                    WildSectionTitle(title: "分阶段耗时与热状态", icon: "waveform.path")
+                    if let metrics = vm.performanceSummary {
+                        HStack(spacing: 8) {
+                            WildStat(number: "\(metrics.p50)ms", caption: "总耗时 P50")
+                            WildStat(number: "\(metrics.p95)ms", caption: "总耗时 P95")
+                            WildStat(number: "\(metrics.max)ms", caption: "最长")
+                        }
+                        Divider()
+                        HStack(spacing: 8) {
+                            WildStat(number: "\(metrics.averageDecode)ms", caption: "解码均值")
+                            WildStat(number: "\(metrics.averageRecognition)ms", caption: "识别均值")
+                            WildStat(number: "\(metrics.count)", caption: "记录样本")
+                        }
+                        if let recent = vm.performanceSamples.last {
+                            Text("最近热状态：\(recent.thermal) · \(recent.configuration)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        ShareLink(item: vm.performanceCSV) {
+                            Label("导出统计 CSV", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.bordered)
+                        Button("清除性能历史", role: .destructive) {
+                            vm.clearPerformanceHistory()
+                        }
+                        .font(.footnote)
+                    } else {
+                        Text("开始 Vision 测试后，将显示解码、推理、P50/P95、最长延迟与设备热状态。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+
+                WildSurface {
                     WildSectionTitle(title: "PaddleOCR 外部对照", icon: "arrow.left.arrow.right")
                     WildPill(text: "外部数据，不是本机 Paddle 推理",
                              icon: "info.circle", tint: WildPalette.violet)
