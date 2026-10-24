@@ -64,7 +64,9 @@ final class WildAppState: ObservableObject {
     @Published var groundTruth = ""
     @Published var packs: [WildOCRModelPack] = []
     @Published var modelStatus = "Paddle 模型文件可导入校验；App 内推理尚未链接"
-    private var times = OCRMetrics()
+    // Separate statistics per image, quality, language and scan region.
+    // Mixing them would make a comparison display misleading P50/P95.
+    private var metricsByConfiguration: [String: OCRMetrics] = [:]
     private(set) var last: OCRBenchmarkResult?
 
     var fingerprint: String? {
@@ -82,7 +84,7 @@ final class WildAppState: ObservableObject {
         rows = []
         comparison = nil
         last = nil
-        times = OCRMetrics()
+        metricsByConfiguration.removeAll()
         summary = "尚未测试"
         status = "已加载图片 · \(Int(photo.size.width)) × \(Int(photo.size.height))"
     }
@@ -93,6 +95,8 @@ final class WildAppState: ObservableObject {
         status = "Apple Vision 本机识别中…"
         let selectedQuality = quality
         let selectedRegion = scanArea.region
+        let statisticKey = hash + "|" + selectedQuality.rawValue + "|" +
+            scanArea.rawValue + "|" + selectedLanguage
         let languageHints = selectedLanguage == "auto" ? [] : [selectedLanguage]
         Task {
             do {
@@ -127,7 +131,9 @@ final class WildAppState: ObservableObject {
                     }
                     return results
                 }.value
-                for result in results { times.record(durationMs: result.time) }
+                var measurements = metricsByConfiguration[statisticKey] ?? OCRMetrics()
+                for result in results { measurements.record(durationMs: result.time) }
+                metricsByConfiguration[statisticKey] = measurements
                 guard let value = results.last else { return }
                 rows = value.blocks
                 measuredMs = value.time
@@ -135,7 +141,7 @@ final class WildAppState: ObservableObject {
                 last = OCRBenchmarkResult(imageSHA256: hash,
                     engineID: "apple-vision", quality: selectedQuality.rawValue,
                     durationMs: value.time, text: text)
-                summary = "Vision \(times.count) 次 · P50 \(times.p50 ?? 0)ms · P95 \(times.p95 ?? 0)ms"
+                summary = "Vision \(measurements.count) 次 · P50 \(measurements.p50 ?? 0)ms · P95 \(measurements.p95 ?? 0)ms"
                 status = "完成 · \(rows.count) 行 · \(value.time)ms"
             } catch {
                 status = "OCR 失败：" + error.localizedDescription
