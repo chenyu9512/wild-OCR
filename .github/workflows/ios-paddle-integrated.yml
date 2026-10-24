@@ -1,6 +1,15 @@
 name: iOS PaddleOCR integrated build
 on:
   workflow_dispatch:
+    inputs:
+      model_preset:
+        description: 'Bundled OCR model'
+        required: true
+        default: 'v5-mobile'
+        type: choice
+        options:
+          - v5-mobile
+          - v6-small
   push:
     paths:
       - '.github/workflows/ios-paddle-integrated.yml'
@@ -25,7 +34,9 @@ jobs:
             https://github.com/PaddlePaddle/PaddleOCR.git "$RUNNER_TEMP/PaddleOCR"
           test "$(git -C "$RUNNER_TEMP/PaddleOCR" rev-parse HEAD)" = \
             'b03f46425e8ff4442b268ce449e3eef758146cd4'
-          python3 tools/fetch_official_paddle_onnx.py             "$RUNNER_TEMP/PaddleOCR/deploy/ios_demo/PaddleOCRDemo/Models"
+          PRESET="${{ github.event.inputs.model_preset || 'v5-mobile' }}"
+          python3 tools/fetch_official_paddle_onnx.py \
+            "$RUNNER_TEMP/PaddleOCR/deploy/ios_demo/PaddleOCRDemo/Models" "$PRESET"
           python3 tools/prepare_integrated_paddle.py "$RUNNER_TEMP/PaddleOCR"
       - name: Generate native Xcode workspace
         run: |
