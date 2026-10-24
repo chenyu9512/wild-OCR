@@ -120,6 +120,7 @@ workflows:
           xcodegen generate --spec project.paddle.yml
           cp Podfile.paddle Podfile
           pod install
+          ruby tools/verify_paddle_pod_targets.rb Pods/Pods.xcodeproj 17.0
       - name: Compile integrated WildOCR experiment
         script: |
           set -e
