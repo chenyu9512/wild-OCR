@@ -96,3 +96,56 @@ workflows:
     artifacts:
       - artifacts/wild-PaddleOCR-upstream-unsigned.ipa
       - artifacts/paddle-build.log
+
+  ios-wild-paddle-integrated-unsigned:
+    name: wild-OCR 0.4.0 — integrated PaddleOCR ONNX on iPhone
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      xcode: '27.1'
+      cocoapods: default
+    scripts:
+      - name: Prepare pinned official PaddleOCR v5 Mobile model and inference engine
+        script: |
+          set -e
+          git clone --depth 1 --filter=blob:none --branch v3.7.0 \
+            https://github.com/PaddlePaddle/PaddleOCR.git "$CM_BUILD_DIR/PaddleOCR-upstream"
+          test "$(git -C "$CM_BUILD_DIR/PaddleOCR-upstream" rev-parse HEAD)" = \
+            'b03f46425e8ff4442b268ce449e3eef758146cd4'
+          python3 tools/fetch_official_paddle_onnx.py \
+            "$CM_BUILD_DIR/PaddleOCR-upstream/deploy/ios_demo/PaddleOCRDemo/Models"
+          python3 tools/prepare_integrated_paddle.py "$CM_BUILD_DIR/PaddleOCR-upstream"
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate --spec project.paddle.yml
+          cp Podfile.paddle Podfile
+          pod install
+      - name: Compile integrated WildOCR experiment
+        script: |
+          set -e
+          mkdir -p "$CM_BUILD_DIR/artifacts"
+          LOG="$CM_BUILD_DIR/artifacts/wild-paddle-integrated-build.log"
+          if xcodebuild -workspace WildOCR.xcworkspace -scheme WildOCR \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$CM_BUILD_DIR/PaddleBuild" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > "$LOG" 2>&1; then
+            tail -n 25 "$LOG"
+          else
+            grep -n -E 'error:|BUILD FAILED|No such module' "$LOG" | head -n 120 || true
+            tail -n 60 "$LOG"
+            exit 65
+          fi
+      - name: Verify built-in models and unsigned IPA
+        script: |
+          set -e
+          APP="$CM_BUILD_DIR/PaddleBuild/Build/Products/Release-iphoneos/WildOCR.app"
+          test -d "$APP/Models/det"
+          test -d "$APP/Models/rec"
+          mkdir -p "$CM_BUILD_DIR/artifacts/Payload"
+          cp -R "$APP" "$CM_BUILD_DIR/artifacts/Payload/WildOCR.app"
+          (cd "$CM_BUILD_DIR/artifacts" &&
+             zip -qr wild-OCR-0.4.0-Paddle-integrated-unsigned.ipa Payload &&
+             rm -rf Payload)
+    artifacts:
+      - artifacts/wild-OCR-0.4.0-Paddle-integrated-unsigned.ipa
+      - artifacts/wild-paddle-integrated-build.log
