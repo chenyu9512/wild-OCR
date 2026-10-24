@@ -49,7 +49,8 @@ struct WildROIEditor: View {
                                             }
                                             .frame(width: bounds.width, height: bounds.height)
                                             .position(x: bounds.midX, y: bounds.midY)
-                                            .gesture(DragGesture(minimumDistance: 0)
+                                            .gesture(DragGesture(minimumDistance: 0,
+                                                coordinateSpace: .named("wildROI"))
                                                 .onChanged { g in
                                                     guard size.width > 0, size.height > 0 else { return }
                                                     let x = clamp(g.location.x / size.width - region.width / 2,
@@ -66,7 +67,8 @@ struct WildROIEditor: View {
                                             .overlay(Circle().stroke(.white, lineWidth: 2))
                                             .frame(width: 27, height: 27)
                                             .position(x: bounds.maxX, y: bounds.maxY)
-                                            .gesture(DragGesture(minimumDistance: 0)
+                                            .gesture(DragGesture(minimumDistance: 0,
+                                                coordinateSpace: .named("wildROI"))
                                                 .onChanged { g in
                                                     guard size.width > 0, size.height > 0 else { return }
                                                     let width = clamp(g.location.x / size.width - region.x,
@@ -79,6 +81,7 @@ struct WildROIEditor: View {
                                                                        width: width, height: height)
                                                 })
                                     }
+                                    .coordinateSpace(name: "wildROI")
                                 }
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 13))
