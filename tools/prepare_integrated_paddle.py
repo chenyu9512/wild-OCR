@@ -34,6 +34,14 @@ for name, source in [
         shutil.rmtree(destination)
     shutil.copytree(source, destination)
 
+# XcodeGen/CocoaPods exposes the ONNX Objective-C API as a framework.
+# The original demo's flat header import relies on its own Xcode header paths.
+bridge = vendor / "Supporting/PaddleOCRDemo-Bridging-Header.h"
+header = bridge.read_text()
+header = header.replace("#import <onnxruntime.h>",
+                        "#import <onnxruntime_objc/onnxruntime.h>")
+bridge.write_text(header)
+
 # Both projects compile into one Swift module. Avoid a global enum symbol
 # collision without changing the public wild-OCR core API.
 for file in (vendor / "Engine").glob("*.swift"):
