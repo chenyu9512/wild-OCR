@@ -58,7 +58,12 @@ final class WildAppState: ObservableObject {
     @Published var showBoxes = true
     @Published private(set) var performanceSamples: [WildOCRPerformanceSample] = []
     var performanceSummary: WildOCRPerformanceSummary? {
-        WildOCRPerformanceSummary(performanceSamples)
+        // Report only comparable runs from the most recent engine and
+        // quality/ROI/language configuration, never a pooled cross-engine P95.
+        guard let latest = performanceSamples.last else { return nil }
+        return WildOCRPerformanceSummary(performanceSamples.filter {
+            $0.engine == latest.engine && $0.configuration == latest.configuration
+        })
     }
     var performanceCSV: String {
         let header = "time,engine,configuration,decode_ms,recognize_ms,total_ms,lines,thermal"
