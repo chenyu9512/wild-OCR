@@ -36,5 +36,6 @@ targets:
         HEADER_SEARCH_PATHS:
           - '$(SRCROOT)/ios/PaddleVendor/Engine'
           - '$(SRCROOT)/ios/PaddleVendor/ThirdParty/Clipper1'
+          - '$(SRCROOT)/Pods/onnxruntime-objc/objectivec'
         CLANG_CXX_LANGUAGE_STANDARD: 'gnu++17'
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: 'NO'
