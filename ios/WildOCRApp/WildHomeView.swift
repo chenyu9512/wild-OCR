@@ -375,11 +375,11 @@ private struct WildScanScreen: View {
             #if WILD_OCR_PADDLE
             Picker("OCR 引擎", selection: $vm.engineID) {
                 Text("Apple Vision").tag("apple-vision")
-                Text("PaddleOCR ONNX (内置模型)").tag("paddle-onnx")
+                Text("PaddleOCR · \(WildPaddleRuntime.bundledModelPreset)").tag("paddle-onnx")
             }
             .pickerStyle(.segmented)
             if vm.engineID == "paddle-onnx" {
-                Text("Paddle 实验版已包含真实本机模型。首次识别需要加载模型；质量选项只影响 Vision。")
+                Text("当前内置 \(WildPaddleRuntime.bundledModelPreset) 模型。首次识别会加载 ONNX 资源；质量选项只影响 Vision。")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             #endif
