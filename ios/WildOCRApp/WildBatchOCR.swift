@@ -58,12 +58,14 @@ final class WildBatchState: ObservableObject {
         status = "正在停止；不会丢失已完成的结果"
     }
 
-    func run(quality: OCRQuality, language: String, region: OCRRegion) {
+    func run(quality: OCRQuality, language: String, region: OCRRegion,
+             engineID: String = "apple-vision") {
         guard !running, !entries.isEmpty, region.isValid else { return }
         running = true
         completed = 0
         status = "批量本机 OCR 运行中"
         let selectedQuality = quality
+        let selectedEngine = engineID
         let hints = language == "auto" ? [] : [language]
         active = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -85,9 +87,21 @@ final class WildBatchState: ObservableObject {
                         }
                         let orientation = image.imageOrientation.wildCGOrientation
                         let start = ProcessInfo.processInfo.systemUptime
-                        let blocks = try AppleVisionOCR.recognize(
+                        let blocks: [OCRBlock]
+                        #if WILD_OCR_PADDLE
+                        if selectedEngine == "paddle-onnx" {
+                            blocks = try await WildPaddleRuntime.shared.recognize(
+                                image, region: region).blocks
+                        } else {
+                            blocks = try AppleVisionOCR.recognize(
+                                cg, orientation: orientation, region: region,
+                                languageHints: hints, quality: selectedQuality)
+                        }
+                        #else
+                        blocks = try AppleVisionOCR.recognize(
                             cg, orientation: orientation, region: region,
                             languageHints: hints, quality: selectedQuality)
+                        #endif
                         return (blocks, max(0, Int(1000 *
                             (ProcessInfo.processInfo.systemUptime - start))))
                     }.value
@@ -146,6 +160,7 @@ struct WildBatchScreen: View {
     let quality: OCRQuality
     let language: String
     let region: OCRRegion
+    let engineID: String
 
     var body: some View {
         ScrollView {
@@ -181,7 +196,8 @@ struct WildBatchScreen: View {
                             .buttonStyle(.borderedProminent)
                     } else {
                         Button {
-                            batch.run(quality: quality, language: language, region: region)
+                            batch.run(quality: quality, language: language, region: region,
+                                      engineID: engineID)
                         } label: {
                             Label("开始批量 OCR", systemImage: "text.viewfinder")
                         }
