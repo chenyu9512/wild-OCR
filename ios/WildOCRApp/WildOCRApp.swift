@@ -6,6 +6,36 @@ import UIKit
 import Vision
 import ImageIO
 
+/// Presets use Vision's normalized lower-left origin.
+enum WildOCRScanArea: String, CaseIterable, Identifiable {
+    case full, dialogue, bottom
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .full: return "整张画面"
+        case .dialogue: return "中间正文"
+        case .bottom: return "底部字幕"
+        }
+    }
+    var region: OCRRegion {
+        switch self {
+        case .full: return .full
+        case .dialogue: return OCRRegion(x: 0.04, y: 0.22, width: 0.92, height: 0.56)
+        case .bottom: return OCRRegion(x: 0.03, y: 0.02, width: 0.94, height: 0.31)
+        }
+    }
+}
+
+struct WildOCRSessionEntry: Identifiable {
+    let id = UUID()
+    let createdAt = Date()
+    let text: String
+    let blockCount: Int
+    let durationMs: Int
+    let quality: String
+    let language: String
+}
+
 @main
 struct WildOCRApp: App {
     var body: some Scene {
@@ -19,6 +49,9 @@ final class WildAppState: ObservableObject {
     @Published var sourceData: Data?
     @Published var quality: OCRQuality = .fast
     @Published var selectedLanguage = "auto"
+    @Published var scanArea: WildOCRScanArea = .full
+    @Published var showBoxes = true
+    @Published var savedSessions: [WildOCRSessionEntry] = []
     @Published var text = ""
     @Published var rows: [OCRBlock] = []
     @Published var status = "从相册或文件导入图片"
@@ -59,6 +92,7 @@ final class WildAppState: ObservableObject {
         busy = true
         status = "Apple Vision 本机识别中…"
         let selectedQuality = quality
+        let selectedRegion = scanArea.region
         let languageHints = selectedLanguage == "auto" ? [] : [selectedLanguage]
         Task {
             do {
@@ -85,8 +119,8 @@ final class WildAppState: ObservableObject {
                         try Task.checkCancellation()
                         let start = ProcessInfo.processInfo.systemUptime
                         let blocks = try AppleVisionOCR.recognize(image,
-                            orientation: orientation, languageHints: languageHints,
-                            quality: selectedQuality)
+                            orientation: orientation, region: selectedRegion,
+                            languageHints: languageHints, quality: selectedQuality)
                         let time = max(0, Int(1000 *
                             (ProcessInfo.processInfo.systemUptime - start)))
                         results.append((blocks: blocks, time: time))
@@ -108,6 +142,36 @@ final class WildAppState: ObservableObject {
             }
             busy = false
         }
+    }
+
+    func saveCurrentResult() {
+        guard !busy, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let entry = WildOCRSessionEntry(text: text, blockCount: rows.count,
+                                        durationMs: measuredMs,
+                                        quality: quality.rawValue, language: selectedLanguage)
+        savedSessions.insert(entry, at: 0)
+        if savedSessions.count > 40 { savedSessions.removeLast() }
+        status = "已保存到本次会话记录（退出 App 后不保留）"
+    }
+
+    func removeSession(_ id: UUID) {
+        savedSessions.removeAll { $0.id == id }
+    }
+
+    func clearSessions() {
+        savedSessions.removeAll()
+    }
+
+    func clearCurrentResult() {
+        rows = []
+        text = ""
+        comparison = nil
+        last = nil
+        groundTruth = ""
+        externalText = ""
+        externalTime = ""
+        summary = "尚未测试"
+        status = photo == nil ? "选择图片开始本机 OCR" : "已清除本次识别结果"
     }
 
     func applyManualPaddle() {
@@ -253,156 +317,3 @@ final class WildAppState: ObservableObject {
     }
 }
 
-struct WildHomeView: View {
-    @StateObject private var vm = WildAppState()
-    @State private var photoPicker: PhotosPickerItem?
-    @State private var selectImageFile = false
-    @State private var selectModelFolder = false
-    @State private var selectComparisonFile = false
-
-    var body: some View {
-        TabView {
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text("wild-OCR").font(.largeTitle.bold()).foregroundStyle(.mint)
-                        Text("Universal OCR · iPhone 本机多语言识别")
-                            .foregroundStyle(.secondary)
-                        PhotosPicker(selection: $photoPicker, matching: .images) {
-                            Label("从相册选择图片", systemImage: "photo.on.rectangle")
-                        }.buttonStyle(.borderedProminent)
-                        Button("从文件导入图片") { selectImageFile = true }
-                        if let image = vm.photo {
-                            Image(uiImage: image).resizable().scaledToFit()
-                                .frame(maxHeight: 250)
-                        }
-                        Picker("OCR 模式", selection: $vm.quality) {
-                            Text("快速").tag(OCRQuality.fast)
-                            Text("高精度").tag(OCRQuality.accurate)
-                        }.pickerStyle(.segmented)
-                        Picker("语言", selection: $vm.selectedLanguage) {
-                            Text("自动识别").tag("auto")
-                            Text("中文").tag("zh-Hans")
-                            Text("日本語").tag("ja-JP")
-                            Text("English").tag("en-US")
-                            Text("한국어").tag("ko-KR")
-                            Text("Русский").tag("ru-RU")
-                            Text("Français").tag("fr-FR")
-                        }
-                        Button(vm.busy ? "识别中…" : "执行本机 OCR") { vm.recognize() }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(vm.busy || vm.photo == nil)
-                        Text(vm.status).font(.caption).foregroundStyle(.mint)
-                        Text(vm.summary).font(.caption.monospacedDigit())
-                        if !vm.text.isEmpty {
-                            HStack {
-                                Text("识别结果").font(.headline)
-                                Spacer()
-                                Button("复制") { UIPasteboard.general.string = vm.text }
-                            }
-                            Text(vm.text).textSelection(.enabled)
-                            ForEach(vm.rows.indices, id: \.self) { i in
-                                Text("\(i+1). \(vm.rows[i].script.rawValue) · \(vm.rows[i].text)")
-                                    .font(.caption)
-                            }
-                        }
-                    }.padding()
-                }.navigationTitle("文字识别")
-            }.tabItem { Label("识别", systemImage: "text.viewfinder") }
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("本机离线模型").font(.title2.bold())
-                        Text("导入含 manifest.json 的文件夹，校验全部 SHA-256。已安装不代表已链接 Paddle 推理。")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button("导入本地模型文件夹") { selectModelFolder = true }
-                            .buttonStyle(.borderedProminent)
-                        Text(vm.modelStatus).font(.caption).foregroundStyle(.mint)
-                        ForEach(WildOCRModelCatalog.titles, id: \.self) { name in
-                            Text(name).frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(12).background(.white.opacity(0.06),
-                                                   in: RoundedRectangle(cornerRadius: 12))
-                        }
-                        Text("已校验模型包：\(vm.packs.count)")
-                        ForEach(vm.packs, id: \.id) { pack in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(pack.displayName)
-                                    Text(pack.id).font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Button("删除", role: .destructive) { vm.deleteModel(pack) }
-                            }.padding(10)
-                        }
-                    }.padding()
-                }.navigationTitle("模型管理")
-            }.tabItem { Label("模型", systemImage: "square.stack") }
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text("Vision / PaddleOCR A/B").font(.title2.bold())
-                        Text("Vision 在本 App 中真实执行；PaddleOCR 结果需从独立的官方 iOS Demo 输入，不会伪装成同进程推理。")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button("Vision 重复执行 5 次") { vm.recognize(repetitions: 5) }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(vm.busy || vm.photo == nil)
-                        Text(vm.summary)
-                        TextField("外部 PaddleOCR 耗时（ms）", text: $vm.externalTime)
-                            .keyboardType(.numberPad).textFieldStyle(.roundedBorder)
-                        TextEditor(text: $vm.externalText).frame(height: 95)
-                        Button("记录外部 PaddleOCR 测试") { vm.applyManualPaddle() }
-                        Button("导入外部 PaddleOCR JSON") { selectComparisonFile = true }
-                        if let result = vm.comparison {
-                            Text("Vision \(vm.measuredMs)ms · Paddle \(result.durationMs)ms")
-                        }
-                        Text("正确文字（用于 CER）").font(.headline)
-                        TextField("输入经人工核对的正确原文", text: $vm.groundTruth,
-                                  axis: .vertical).lineLimit(3...8)
-                            .textFieldStyle(.roundedBorder)
-                        if let cer = vm.visionCER {
-                            Text(String(format: "Vision CER %.1f%%", cer * 100))
-                        }
-                        if let cer = vm.paddleCER {
-                            Text(String(format: "PaddleOCR CER %.1f%%", cer * 100))
-                        }
-                    }.padding()
-                }.navigationTitle("对照测试")
-            }.tabItem { Label("对照", systemImage: "chart.bar.xaxis") }
-        }
-        .tint(.mint)
-        .fileImporter(isPresented: $selectImageFile, allowedContentTypes: [.image]) {
-            acceptFile($0, category: 1)
-        }
-        .fileImporter(isPresented: $selectComparisonFile, allowedContentTypes: [.json]) {
-            acceptFile($0, category: 2)
-        }
-        .fileImporter(isPresented: $selectModelFolder, allowedContentTypes: [.folder]) {
-            switch $0 {
-            case .success(let url): vm.installFolder(url)
-            case .failure(let e): vm.modelStatus = e.localizedDescription
-            }
-        }
-        .onChange(of: photoPicker) { _, item in
-            guard let item else { return }
-            Task {
-                do {
-                    if let bytes = try await item.loadTransferable(type: Data.self) {
-                        vm.load(bytes)
-                    }
-                } catch { vm.status = error.localizedDescription }
-            }
-        }
-        .onAppear { vm.refreshModels() }
-    }
-
-    private func acceptFile(_ result: Result<URL, Error>, category: Int) {
-        do {
-            let url = try result.get()
-            let granted = url.startAccessingSecurityScopedResource()
-            defer { if granted { url.stopAccessingSecurityScopedResource() } }
-            let data = try Data(contentsOf: url)
-            if category == 1 { vm.load(data) }
-            else { vm.importPaddleReport(data) }
-        } catch { vm.status = "导入失败：" + error.localizedDescription }
-    }
-}
