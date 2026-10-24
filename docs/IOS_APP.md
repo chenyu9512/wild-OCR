@@ -1,8 +1,9 @@
-# wild-OCR 0.3.0 iPhone app
+# wild-OCR 0.4.0 iPhone application
+
 
 This is a standalone iOS 17+ SwiftUI app. It includes local Apple Vision recognition (Fast/Accurate and automatic language hints), PhotosPicker/Files image import, OCR text and reading-order blocks, copy action, native timing P50/P95, externally reported PaddleOCR A/B and character error rate (CER).
 
-## User experience (0.3.0)
+## User experience (0.4.0)
 
 - **Recognize:** redesigned capture workspace, picture-box overlay, multi-language choices, Fast/Accurate modes, scan region presets, copied/shared results, and detailed per-line text.
 - **Records:** explicitly save recent OCR output to an in-memory list for the current session. This is not a persistent archive; closing the app discards it.
@@ -26,10 +27,29 @@ Compare the same screenshot in both apps; manually enter the external Paddle tim
 
 ## Build
 
-Codemagic `ios-wild-ocr-unsigned` generates the Xcode project with XcodeGen and produces an unsigned wild-OCR-0.3.0-unsigned.ipa for further signing (e.g. SideStore). GitHub Actions checks the Swift Package and native Xcode app. Neither iOS build nor real device speed has been confirmed until CI actually succeeds.
+Codemagic `ios-wild-ocr-unsigned` generates the Xcode project with XcodeGen and produces an unsigned wild-OCR-0.4.0-unsigned.ipa for further signing (e.g. SideStore). GitHub Actions checks the Swift Package and native Xcode app. Neither iOS build nor real device speed has been confirmed until CI actually succeeds.
 
 ## Work remaining
 
 Actual PaddleOCR inside wild-OCR process, full 100+ language pack compatibility, mixed-script per-region routing, live screen capture, native cross-engine speed/CER/thermal benchmarks and 30-minute stability tests.
 
 Official guide: https://www.paddleocr.ai/latest/en/version3.x/inference_deployment/cross_platform/ios_deployment.html
+
+
+## 0.4.0 additions
+
+- Bulk OCR accepts at most 24 photos/images; decodes sequentially to avoid concurrently saturating an iPhone. The results can be copied individually or shared as a plain-text batch. Cancel retains already completed results. File size is limited to 16 MB per image.
+- Custom Vision ROI is expressed in normalized bottom-left coordinates, matching Vision. The image editor lets the user drag/resize and adjust x, y, width, height with sliders.
+- Per-operation OCR diagnostics split image decoding from recognition and report total P50/P95/maximum, sample count, basic thermal state, and exportable metrics CSV. Do not mix source images or language/ROI quality settings when comparing.
+- The experimental in-app PaddleOCR build uses PaddlePaddle PP-OCRv5 Mobile detection and recognition ONNX models together with original iOS demo inference engine/bridges. SwiftUI engine selection, batch OCR, and direct Vision/Paddle A/B exercise actual ONNX inference. It is **not** part of the default Vision-only IPA.
+
+### Integrated PaddleOCR experiment
+
+GitHub Actions: \`iOS PaddleOCR integrated build\` (manual and integration-source changes).
+Codemagic: \`ios-wild-paddle-integrated-unsigned\`.
+
+Both workflows pin PaddleOCR source tag v3.7.0 at commit b03f46425e8ff4442b268ce449e3eef758146cd4, fetch \`PaddlePaddle/PP-OCRv5_mobile_det_onnx\` and \`PaddlePaddle/PP-OCRv5_mobile_rec_onnx\` from PaddlePaddle's official Hugging Face repos at build time, verify ONNX SHA-256, vendor all official Swift/ObjC++ engine components, then compile the separate \`com.chenyu9512.wildocr.paddle\` application with ONNX Runtime, OpenCV and Yams.
+
+The downloaded v5 model is not a universal 106-language model; targeted alternative script recognizers (Korean, Cyrillic, Arabic, South Asian, etc.) are future work.
+
+Do not claim a valid experimental IPA unless its actual CI has passed. The app itself does not automatically download model files or call paid APIs.
