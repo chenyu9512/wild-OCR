@@ -29,21 +29,25 @@ final class WildBatchState: ObservableObject {
     private var active: Task<Void, Never>?
     static let maxItems = 24
     static let maxBytesPerImage = 16_000_000
+    static let maxSessionImageBytes = 96_000_000
 
     func add(_ images: [(name: String, data: Data)]) {
         guard !running else { return }
         var rejected = 0
+        var totalBytes = entries.reduce(0) { $0 + $1.bytes.count }
         for image in images {
             guard entries.count < Self.maxItems,
+                  totalBytes + image.data.count <= Self.maxSessionImageBytes,
                   image.data.count <= Self.maxBytesPerImage,
                   UIImage(data: image.data)?.cgImage != nil else {
                 rejected += 1
                 continue
             }
             entries.append(WildBatchItem(name: image.name, bytes: image.data))
+            totalBytes += image.data.count
         }
         status = rejected == 0 ? "已导入 \(entries.count) 张" :
-            "已导入 \(entries.count) 张；跳过 \(rejected) 张超限或无法解码的图片"
+            "已导入 \(entries.count) 张；跳过 \(rejected) 张超出图片/会话容量或无法解码的图片"
     }
 
     func clear() {
