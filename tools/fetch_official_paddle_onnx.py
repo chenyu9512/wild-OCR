@@ -10,15 +10,28 @@ import hashlib
 import sys
 import urllib.request
 
-if len(sys.argv) != 2:
-    raise SystemExit("Usage: fetch_official_paddle_onnx.py /output/Models")
+if len(sys.argv) not in (2, 3):
+    raise SystemExit("Usage: fetch_official_paddle_onnx.py /output/Models [v5-mobile|v6-small]")
 root = Path(sys.argv[1])
-models = {
-    "det": ("PaddlePaddle/PP-OCRv5_mobile_det_onnx",
-            "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d"),
-    "rec": ("PaddlePaddle/PP-OCRv5_mobile_rec_onnx",
-            "da72dc72ca4dc220df0dfde68c1dedc31c58d3e76a25871122e5056227d50092"),
+preset = sys.argv[2] if len(sys.argv) == 3 else "v5-mobile"
+presets = {
+    "v5-mobile": {
+        "det": ("PaddlePaddle/PP-OCRv5_mobile_det_onnx",
+                "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d"),
+        "rec": ("PaddlePaddle/PP-OCRv5_mobile_rec_onnx",
+                "da72dc72ca4dc220df0dfde68c1dedc31c58d3e76a25871122e5056227d50092"),
+    },
+    "v6-small": {
+        "det": ("PaddlePaddle/PP-OCRv6_small_det_onnx",
+                "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e"),
+        "rec": ("PaddlePaddle/PP-OCRv6_small_rec_onnx",
+                "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634"),
+    },
 }
+if preset not in presets:
+    raise SystemExit("Unsupported Paddle OCR preset: " + preset)
+models = presets[preset]
+
 for part, (model, expected_sha) in models.items():
     destination = root / part
     destination.mkdir(parents=True, exist_ok=True)
