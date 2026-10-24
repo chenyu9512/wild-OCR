@@ -9,6 +9,14 @@ import UIKit
 /// vendored from a pinned upstream commit at build time.
 actor WildPaddleRuntime {
     static let shared = WildPaddleRuntime()
+    static var bundledModelPreset: String {
+        guard let path = Bundle.main.path(forResource: "preset",
+            ofType: "txt", inDirectory: "Models"),
+              let text = try? String(contentsOfFile: path, encoding: .utf8) else {
+            return "unknown"
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     private let sessionManager = ORTSessionManager()
     private var loadedEngine: OCREngine?
 
