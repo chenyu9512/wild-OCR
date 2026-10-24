@@ -50,6 +50,7 @@ final class WildAppState: ObservableObject {
     @Published var photo: UIImage?
     @Published var sourceData: Data?
     @Published var quality: OCRQuality = .fast
+    @Published var engineID = "apple-vision"
     @Published var selectedLanguage = "auto"
     @Published var scanArea: WildOCRScanArea = .full
     @Published var customRegion = OCRRegion(x: 0.06, y: 0.10, width: 0.88, height: 0.80)
@@ -108,10 +109,11 @@ final class WildAppState: ObservableObject {
     func recognize(repetitions: Int = 1) {
         guard !busy, let bytes = sourceData, let hash = fingerprint else { return }
         busy = true
-        status = "Apple Vision 本机识别中…"
+        status = engineID == "paddle-onnx" ? "PaddleOCR 模型本机识别中…" : "Apple Vision 本机识别中…"
         let selectedQuality = quality
+        let selectedEngine = engineID
         let selectedRegion = effectiveRegion
-        let statisticKey = hash + "|" + selectedQuality.rawValue + "|" +
+        let statisticKey = hash + "|" + selectedEngine + "|" + selectedQuality.rawValue + "|" +
             scanArea.rawValue + "|" + selectedLanguage
         let languageHints = selectedLanguage == "auto" ? [] : [selectedLanguage]
         Task {
@@ -141,9 +143,21 @@ final class WildAppState: ObservableObject {
                     for _ in 0..<min(20, max(1, repetitions)) {
                         try Task.checkCancellation()
                         let start = ProcessInfo.processInfo.systemUptime
-                        let blocks = try AppleVisionOCR.recognize(image,
+                        let blocks: [OCRBlock]
+                        #if WILD_OCR_PADDLE
+                        if selectedEngine == "paddle-onnx" {
+                            blocks = try await WildPaddleRuntime.shared.recognize(
+                                photo, region: selectedRegion).blocks
+                        } else {
+                            blocks = try AppleVisionOCR.recognize(image,
+                                orientation: orientation, region: selectedRegion,
+                                languageHints: languageHints, quality: selectedQuality)
+                        }
+                        #else
+                        blocks = try AppleVisionOCR.recognize(image,
                             orientation: orientation, region: selectedRegion,
                             languageHints: languageHints, quality: selectedQuality)
+                        #endif
                         let time = max(0, Int(1000 *
                             (ProcessInfo.processInfo.systemUptime - start)))
                         results.append((blocks: blocks, time: time,
@@ -165,7 +179,7 @@ final class WildAppState: ObservableObject {
                 }
                 for result in results {
                     performanceSamples.append(WildOCRPerformanceSample(
-                        engine: "apple-vision", configuration: selectedQuality.rawValue
+                        engine: selectedEngine, configuration: selectedQuality.rawValue
                             + "-" + scanArea.rawValue + "-" + selectedLanguage,
                         decodeMs: result.decodeMs, recognizeMs: result.time,
                         totalMs: result.totalMs, lines: result.blocks.count,
@@ -180,9 +194,9 @@ final class WildAppState: ObservableObject {
                 measuredMs = value.time
                 text = rows.map(\.text).joined(separator: "\n")
                 last = OCRBenchmarkResult(imageSHA256: hash,
-                    engineID: "apple-vision", quality: selectedQuality.rawValue,
+                    engineID: selectedEngine, quality: selectedQuality.rawValue,
                     durationMs: value.time, text: text)
-                summary = "Vision \(measurements.count) 次 · P50 \(measurements.p50 ?? 0)ms · P95 \(measurements.p95 ?? 0)ms"
+                summary = "\(selectedEngine) \(measurements.count) 次 · P50 \(measurements.p50 ?? 0)ms · P95 \(measurements.p95 ?? 0)ms"
                 status = "完成 · \(rows.count) 行 · \(value.time)ms"
             } catch {
                 status = "OCR 失败：" + error.localizedDescription
