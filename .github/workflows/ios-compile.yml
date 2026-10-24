@@ -1,4 +1,4 @@
-name: iOS app compile
+name: iOS app build and unsigned IPA
 on:
   push:
   pull_request:
@@ -8,9 +8,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
-        run: brew install xcodegen
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
       - name: Generate Xcode project
         run: xcodegen generate --spec project.yml
       - name: Compile app for generic iPhone
         run: |
-          xcodebuild -project WildOCR.xcodeproj -scheme WildOCR             -configuration Debug -sdk iphoneos -destination 'generic/platform=iOS'             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO             CODE_SIGN_IDENTITY="" build
+          set -e
+          xcodebuild -project WildOCR.xcodeproj -scheme WildOCR \
+            -configuration Debug -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath /tmp/WildOCR-Build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" build
+      - name: Package unsigned IPA
+        run: |
+          set -e
+          APP="/tmp/WildOCR-Build/Build/Products/Debug-iphoneos/WildOCR.app"
+          test -d "$APP"
+          mkdir -p /tmp/wildocr-artifacts/Payload
+          cp -R "$APP" /tmp/wildocr-artifacts/Payload/WildOCR.app
+          (cd /tmp/wildocr-artifacts && zip -qr wild-OCR-unsigned.ipa Payload)
+          rm -rf /tmp/wildocr-artifacts/Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wild-OCR-unsigned-IPA
+          path: /tmp/wildocr-artifacts/wild-OCR-unsigned.ipa
+          retention-days: 7
