@@ -17,7 +17,7 @@ The integrated Paddle build has its own bundle ID and is not the same as the sta
 
 The `ios/WildOCRApp` app now provides a four-tab SwiftUI product experience: **Recognize, Session Records, Model Center, Benchmark Lab**, plus appearance/privacy settings. It includes offline Apple Vision OCR from PhotosPicker or Files, Fast/Accurate selection, region presets (full / center / bottom), automatic or explicit language hints, text-box overlays, copy and share, manual session-only saved results, detected scripts and positions, and actual device OCR P50/P95 timing.
 
-It also includes a **verified local PaddleOCR model manager** (manifest + SHA-256 check) and a Vision vs PaddleOCR comparison screen with exact-image matching and ground-truth character error rate. The Paddle runtime is **not yet running inside this app**; its models remain inactive even after verification. To benchmark real Paddle inference, a second Codemagic workflow builds PaddleOCR's **official standalone iOS demo** with ONNX Runtime.
+The standard IPA includes a **verified local PaddleOCR model manager** (manifest + SHA-256 check) and a Vision vs external PaddleOCR comparison screen with exact-image matching and ground-truth CER. Manually imported Paddle models do not become executable simply by importing them. The **separate integrated experimental IPA** builds actual in-process PaddleOCR ONNX detection and recognition with a bundled, pinned PP-OCRv5 Mobile model; it can run two local engines, if its native build passes. The independent original PaddleOCR demo can still be built for cross-checking.
 
 ## Build
 
