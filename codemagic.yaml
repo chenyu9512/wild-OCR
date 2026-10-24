@@ -115,7 +115,7 @@ workflows:
           PRESET="${PADDLE_MODEL_PRESET:-v5-mobile}"
           python3 tools/fetch_official_paddle_onnx.py \
             "$CM_BUILD_DIR/PaddleOCR-upstream/deploy/ios_demo/PaddleOCRDemo/Models" "$PRESET"
-          python3 tools/prepare_integrated_paddle.py "$CM_BUILD_DIR/PaddleOCR-upstream"
+          python3 tools/prepare_integrated_paddle.py "$CM_BUILD_DIR/PaddleOCR-upstream" "$PRESET"
           command -v xcodegen >/dev/null || brew install xcodegen
           xcodegen generate --spec project.paddle.yml
           cp Podfile.paddle Podfile
