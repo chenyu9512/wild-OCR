@@ -160,9 +160,10 @@ final class WildAppState: ObservableObject {
                         #endif
                         let time = max(0, Int(1000 *
                             (ProcessInfo.processInfo.systemUptime - start)))
+                        let thisDecodeMs = results.isEmpty ? decodeMs : 0
                         results.append((blocks: blocks, time: time,
-                                        decodeMs: decodeMs,
-                                        totalMs: time + decodeMs))
+                                        decodeMs: thisDecodeMs,
+                                        totalMs: time + thisDecodeMs))
                     }
                     return results
                 }.value
