@@ -25,7 +25,7 @@ final class WildBatchState: ObservableObject {
     @Published private(set) var entries: [WildBatchItem] = []
     @Published private(set) var running = false
     @Published private(set) var completed = 0
-    @Published private(set) var status = "选择多张图片，逐张进行本机 OCR"
+    @Published var status = "选择多张图片，逐张进行本机 OCR"
     private var active: Task<Void, Never>?
     static let maxItems = 24
     static let maxBytesPerImage = 16_000_000
@@ -204,7 +204,7 @@ struct WildBatchScreen: View {
                             Spacer()
                             Text(item.status)
                                 .font(.caption)
-                                .foregroundStyle(item.failure == nil ? .secondary : .red)
+                                .foregroundStyle(item.failure == nil ? Color.secondary : Color.red)
                         }
                         if let failure = item.failure {
                             Text(failure).font(.caption).foregroundStyle(.red)
