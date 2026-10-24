@@ -16,6 +16,7 @@ on:
       - 'tools/prepare_integrated_paddle.py'
       - 'project.paddle.yml'
       - 'Podfile.paddle'
+      - 'tools/verify_paddle_pod_targets.rb'
       - 'ios/WildOCRApp/WildPaddleRuntime.swift'
       - 'tools/fetch_official_paddle_onnx.py'
 jobs:
@@ -43,6 +44,7 @@ jobs:
           xcodegen generate --spec project.paddle.yml
           cp Podfile.paddle Podfile
           pod install
+          ruby tools/verify_paddle_pod_targets.rb Pods/Pods.xcodeproj 17.0
       - name: Compile actual in-app PaddleOCR
         run: |
           xcodebuild -workspace WildOCR.xcworkspace -scheme WildOCR \
