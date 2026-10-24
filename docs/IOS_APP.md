@@ -1,6 +1,16 @@
-# wild-OCR 0.2.0 iPhone app
+# wild-OCR 0.3.0 iPhone app
 
 This is a standalone iOS 17+ SwiftUI app. It includes local Apple Vision recognition (Fast/Accurate and automatic language hints), PhotosPicker/Files image import, OCR text and reading-order blocks, copy action, native timing P50/P95, externally reported PaddleOCR A/B and character error rate (CER).
+
+## User experience (0.3.0)
+
+- **Recognize:** redesigned capture workspace, picture-box overlay, multi-language choices, Fast/Accurate modes, scan region presets, copied/shared results, and detailed per-line text.
+- **Records:** explicitly save recent OCR output to an in-memory list for the current session. This is not a persistent archive; closing the app discards it.
+- **Model Center:** separate the functioning Apple Vision engine from verified-but-inactive PaddleOCR model packs. Import models with checksum validation, view installed packs and delete them with confirmation.
+- **Benchmark Lab:** run five actual local Vision measurements; compare manually collected Paddle results (or SHA-matched JSON); calculate character error rate against manually provided ground truth.
+- **Settings:** dark/light/system appearance, bounding-box visibility, privacy disclosure, and clear session data.
+
+The app does **not** perform live system-wide OCR, PiP, in-app PaddleOCR inference or cloud-based recognition. Unsupported Vision language hints may fall back to auto recognition. The application needs on-device benchmarking before performance claims.
 
 ## Offline model packs
 
@@ -16,7 +26,7 @@ Compare the same screenshot in both apps; manually enter the external Paddle tim
 
 ## Build
 
-Codemagic `ios-wild-ocr-unsigned` generates the Xcode project with XcodeGen and produces an unsigned wild-OCR-0.2.0-unsigned.ipa for further signing (e.g. SideStore). GitHub Actions checks the Swift Package and native Xcode app. Neither iOS build nor real device speed has been confirmed until CI actually succeeds.
+Codemagic `ios-wild-ocr-unsigned` generates the Xcode project with XcodeGen and produces an unsigned wild-OCR-0.3.0-unsigned.ipa for further signing (e.g. SideStore). GitHub Actions checks the Swift Package and native Xcode app. Neither iOS build nor real device speed has been confirmed until CI actually succeeds.
 
 ## Work remaining
 
