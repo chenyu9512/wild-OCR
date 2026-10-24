@@ -52,4 +52,6 @@ Both workflows pin PaddleOCR source tag v3.7.0 at commit b03f46425e8ff4442b268ce
 
 The downloaded v5 model is not a universal 106-language model; targeted alternative script recognizers (Korean, Cyrillic, Arabic, South Asian, etc.) are future work.
 
+Two preset choices are now exposed in the integrated build workflow: `v5-mobile` (the already compiled baseline, commonly used for Chinese/English/Japanese) and `v6-small` (a broader 50-language model that still does not cover every writing system). Use GitHub Actions → `iOS PaddleOCR integrated build` → Run workflow → choose `model_preset`, or set `PADDLE_MODEL_PRESET=v6-small` in the Codemagic environment. Both use official PaddlePaddle-hosted Hugging Face ONNX model files and pinned SHA-256 checksums. The app reads `Models/preset.txt` and displays which model was packaged, so A/B reports are not silently misidentified.
+
 Do not claim a valid experimental IPA unless its actual CI has passed. The app itself does not automatically download model files or call paid APIs.
