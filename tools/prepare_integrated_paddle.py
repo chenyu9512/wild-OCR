@@ -42,6 +42,25 @@ header = header.replace("#import <onnxruntime.h>",
                         "#import <onnxruntime_objc/onnxruntime.h>")
 bridge.write_text(header)
 
+# The demo's optional ORT JSON profiler reads private onnxruntime-objc C++ ivars.
+# We do not enable that profiling mode in wild-OCR. Replace it with a safe
+# explicit unsupported stub rather than linking against unstable private APIs.
+# Detection and recognition inference remain exactly the official implementation.
+(vendor / "Engine/ORTProfilingBridge.mm").write_text(
+    '#import "ORTProfilingBridge.h"\n'
+    '@implementation ORTProfilingBridge\n'
+    '+ (BOOL)enableProfilingOnSessionOptions:(ORTSessionOptions *)options '
+    'pathPrefix:(NSString *)prefix error:(NSError **)error {\n'
+    '  if (error) *error = [NSError errorWithDomain:@"wild.paddle" code:501 '
+    'userInfo:@{NSLocalizedDescriptionKey:@"ORT JSON profiling disabled"}];\n'
+    '  return NO;\n}\n'
+    '+ (NSString *)endProfilingOnSession:(ORTSession *)session '
+    'error:(NSError **)error {\n'
+    '  if (error) *error = [NSError errorWithDomain:@"wild.paddle" code:501 '
+    'userInfo:@{NSLocalizedDescriptionKey:@"ORT JSON profiling disabled"}];\n'
+    '  return nil;\n}\n@end\n'
+)
+
 # Both projects compile into one Swift module. Avoid a global enum symbol
 # collision without changing the public wild-OCR core API.
 for file in (vendor / "Engine").glob("*.swift"):
