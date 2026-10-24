@@ -8,6 +8,7 @@ on:
       - 'project.paddle.yml'
       - 'Podfile.paddle'
       - 'ios/WildOCRApp/WildPaddleRuntime.swift'
+      - 'tools/fetch_official_paddle_onnx.py'
 jobs:
   integrated:
     runs-on: macos-15
@@ -24,8 +25,7 @@ jobs:
             https://github.com/PaddlePaddle/PaddleOCR.git "$RUNNER_TEMP/PaddleOCR"
           test "$(git -C "$RUNNER_TEMP/PaddleOCR" rev-parse HEAD)" = \
             'b03f46425e8ff4442b268ce449e3eef758146cd4'
-          (cd "$RUNNER_TEMP/PaddleOCR/deploy/ios_demo" &&
-             bash scripts/fetch_ios_demo_models.sh PP-OCRv5_mobile)
+          python3 tools/fetch_official_paddle_onnx.py             "$RUNNER_TEMP/PaddleOCR/deploy/ios_demo/PaddleOCRDemo/Models"
           python3 tools/prepare_integrated_paddle.py "$RUNNER_TEMP/PaddleOCR"
       - name: Generate native Xcode workspace
         run: |
