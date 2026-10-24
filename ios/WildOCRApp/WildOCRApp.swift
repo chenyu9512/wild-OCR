@@ -235,6 +235,82 @@ final class WildAppState: ObservableObject {
         status = photo == nil ? "选择图片开始本机 OCR" : "已清除本次识别结果"
     }
 
+    func runVisionBenchmark(repetitions: Int = 5) {
+        guard !busy else { return }
+        engineID = "apple-vision"
+        recognize(repetitions: repetitions)
+    }
+
+    #if WILD_OCR_PADDLE
+    /// True in-process A/B: calls two independent native OCR engines on the
+    /// exact same picture and ROI. No file upload or third-party API.
+    func runIntegratedAB() {
+        guard !busy, let bytes = sourceData, let hash = fingerprint else { return }
+        busy = true
+        status = "正在对照 Vision 和 PaddleOCR（首次加载模型可能较慢）"
+        let area = effectiveRegion
+        let chosenQuality = quality
+        let hints = selectedLanguage == "auto" ? [] : [selectedLanguage]
+        Task {
+            do {
+                let (vision, visionMs, paddle, paddleMs) =
+                    try await Task.detached(priority: .userInitiated) {
+                        () async throws -> ([OCRBlock], Int, [OCRBlock], Int) in
+                        guard let image = UIImage(data: bytes), let cg = image.cgImage else {
+                            throw NSError(domain: "wild.ab", code: 1,
+                                          userInfo: [NSLocalizedDescriptionKey: "图片解码失败"])
+                        }
+                        let orientation: CGImagePropertyOrientation
+                        switch image.imageOrientation {
+                        case .up: orientation = .up
+                        case .down: orientation = .down
+                        case .left: orientation = .left
+                        case .right: orientation = .right
+                        case .upMirrored: orientation = .upMirrored
+                        case .downMirrored: orientation = .downMirrored
+                        case .leftMirrored: orientation = .leftMirrored
+                        case .rightMirrored: orientation = .rightMirrored
+                        @unknown default: orientation = .up
+                        }
+                        let startVision = ProcessInfo.processInfo.systemUptime
+                        let vision = try AppleVisionOCR.recognize(
+                            cg, orientation: orientation, region: area,
+                            languageHints: hints, quality: chosenQuality)
+                        let visionMs = Int(1000 * (ProcessInfo.processInfo.systemUptime - startVision))
+                        let startPaddle = ProcessInfo.processInfo.systemUptime
+                        let paddle = try await WildPaddleRuntime.shared.recognize(
+                            image, region: area).blocks
+                        let paddleMs = Int(1000 * (ProcessInfo.processInfo.systemUptime - startPaddle))
+                        return (vision, max(0, visionMs), paddle, max(0, paddleMs))
+                    }.value
+                rows = vision
+                text = vision.map(\.text).joined(separator: "\n")
+                measuredMs = visionMs
+                last = OCRBenchmarkResult(imageSHA256: hash,
+                    engineID: "apple-vision", quality: chosenQuality.rawValue,
+                    durationMs: visionMs, text: text)
+                comparison = OCRBenchmarkResult(imageSHA256: hash,
+                    engineID: "paddle-onnx", quality: "integrated",
+                    durationMs: paddleMs, text: paddle.map(\.text).joined(separator: "\n"))
+                performanceSamples.append(WildOCRPerformanceSample(
+                    engine: "apple-vision", configuration: "native-ab",
+                    decodeMs: 0, recognizeMs: visionMs, totalMs: visionMs, lines: vision.count))
+                performanceSamples.append(WildOCRPerformanceSample(
+                    engine: "paddle-onnx", configuration: "native-ab",
+                    decodeMs: 0, recognizeMs: paddleMs, totalMs: paddleMs, lines: paddle.count))
+                if performanceSamples.count > 256 {
+                    performanceSamples.removeFirst(performanceSamples.count - 256)
+                }
+                summary = "本机 A/B：Vision \(visionMs)ms / PaddleOCR \(paddleMs)ms"
+                status = "双引擎对照完成（Paddle 包含首次模型加载时需另做热身测试）"
+            } catch {
+                status = "本机 A/B 失败：" + error.localizedDescription
+            }
+            busy = false
+        }
+    }
+    #endif
+
     func applyManualPaddle() {
         guard let hash = fingerprint, let duration = Int(externalTime), duration >= 0 else {
             status = "请先选图，并输入真实的 PaddleOCR 耗时"; return
