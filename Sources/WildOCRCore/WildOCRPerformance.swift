@@ -39,7 +39,7 @@ public struct WildOCRPerformanceSummary {
         let ordered = items.map(\.totalMs).sorted()
         let n = ordered.count
         func percentile(_ p: Double) -> Int {
-            ordered[max(0, min(n - 1, Int(ceil(Double(n) * p)) - 1))]
+            ordered[Swift.max(0, Swift.min(n - 1, Int(ceil(Double(n) * p)) - 1))]
         }
         count = n
         p50 = percentile(0.5)
