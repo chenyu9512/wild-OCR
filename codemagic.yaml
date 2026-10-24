@@ -35,9 +35,9 @@ workflows:
           test -d "$APP"
           mkdir -p "$CM_BUILD_DIR/artifacts/Payload"
           cp -R "$APP" "$CM_BUILD_DIR/artifacts/Payload/WildOCR.app"
-          (cd "$CM_BUILD_DIR/artifacts" && zip -qr wild-OCR-0.2.0-unsigned.ipa Payload && rm -rf Payload)
+          (cd "$CM_BUILD_DIR/artifacts" && zip -qr wild-OCR-0.3.0-unsigned.ipa Payload && rm -rf Payload)
     artifacts:
-      - artifacts/wild-OCR-0.2.0-unsigned.ipa
+      - artifacts/wild-OCR-0.3.0-unsigned.ipa
       - artifacts/wildOCR-build.log
 
   ios-paddle-upstream-unsigned:
