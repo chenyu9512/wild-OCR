@@ -248,6 +248,7 @@ struct WildHomeView: View {
 
 private struct WildScanScreen: View {
     @ObservedObject var vm: WildAppState
+    @State private var showROIEditor = false
     @Binding var photoPicker: PhotosPickerItem?
     let openFiles: () -> Void
 
@@ -265,6 +266,16 @@ private struct WildScanScreen: View {
 
                 previewPanel
                 controlsPanel
+                NavigationLink {
+                    WildBatchScreen(quality: vm.quality, language: vm.selectedLanguage,
+                                    region: vm.effectiveRegion)
+                } label: {
+                    Label("批量识别图片", systemImage: "square.stack.3d.down.right")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                }
+                .background(WildPalette.surface, in: RoundedRectangle(cornerRadius: 17))
 
                 WildPrimaryButton(
                     title: vm.busy ? "识别正在运行" : "开始识别",
@@ -303,6 +314,9 @@ private struct WildScanScreen: View {
         .background(WildPalette.background)
         .navigationTitle("wild-OCR")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showROIEditor) {
+            WildROIEditor(picture: vm.photo, region: $vm.customRegion)
+        }
     }
 
     private var previewPanel: some View {
@@ -395,6 +409,14 @@ private struct WildScanScreen: View {
                 }
                 .labelsHidden()
                 .tint(WildPalette.mint)
+            }
+            if vm.scanArea == .custom {
+                Button {
+                    showROIEditor = true
+                } label: {
+                    Label("拖动调整识别区域", systemImage: "crop")
+                }
+                .buttonStyle(.bordered)
             }
             Toggle(isOn: $vm.showBoxes) {
                 Label("显示文字定位框", systemImage: "square.dashed")
