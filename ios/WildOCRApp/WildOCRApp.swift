@@ -8,13 +8,14 @@ import ImageIO
 
 /// Presets use Vision's normalized lower-left origin.
 enum WildOCRScanArea: String, CaseIterable, Identifiable {
-    case full, dialogue, bottom
+    case full, dialogue, bottom, custom
     var id: String { rawValue }
     var title: String {
         switch self {
         case .full: return "整张画面"
         case .dialogue: return "中间正文"
         case .bottom: return "底部字幕"
+        case .custom: return "自定义区域"
         }
     }
     var region: OCRRegion {
@@ -22,6 +23,7 @@ enum WildOCRScanArea: String, CaseIterable, Identifiable {
         case .full: return .full
         case .dialogue: return OCRRegion(x: 0.04, y: 0.22, width: 0.92, height: 0.56)
         case .bottom: return OCRRegion(x: 0.03, y: 0.02, width: 0.94, height: 0.31)
+        case .custom: return .full
         }
     }
 }
@@ -50,6 +52,8 @@ final class WildAppState: ObservableObject {
     @Published var quality: OCRQuality = .fast
     @Published var selectedLanguage = "auto"
     @Published var scanArea: WildOCRScanArea = .full
+    @Published var customRegion = OCRRegion(x: 0.06, y: 0.10, width: 0.88, height: 0.80)
+    var effectiveRegion: OCRRegion { scanArea == .custom ? customRegion : scanArea.region }
     @Published var showBoxes = true
     @Published var savedSessions: [WildOCRSessionEntry] = []
     @Published var text = ""
@@ -94,7 +98,7 @@ final class WildAppState: ObservableObject {
         busy = true
         status = "Apple Vision 本机识别中…"
         let selectedQuality = quality
-        let selectedRegion = scanArea.region
+        let selectedRegion = effectiveRegion
         let statisticKey = hash + "|" + selectedQuality.rawValue + "|" +
             scanArea.rawValue + "|" + selectedLanguage
         let languageHints = selectedLanguage == "auto" ? [] : [selectedLanguage]
