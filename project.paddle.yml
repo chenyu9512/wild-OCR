@@ -1,0 +1,40 @@
+name: WildOCR
+options:
+  bundleIdPrefix: com.chenyu9512
+settings:
+  base:
+    SWIFT_VERSION: '5.9'
+    IPHONEOS_DEPLOYMENT_TARGET: '17.0'
+    TARGETED_DEVICE_FAMILY: '1'
+    MARKETING_VERSION: '0.4.0'
+    CURRENT_PROJECT_VERSION: '4'
+targets:
+  WildOCR:
+    type: application
+    platform: iOS
+    deploymentTarget: '17.0'
+    sources:
+      - path: ios/WildOCRApp
+        excludes:
+          - Info.plist
+          - Models
+      - path: ios/WildOCRApp/Models
+        type: folder
+        buildPhase: resources
+      - path: ios/PaddleVendor/Engine
+      - path: ios/PaddleVendor/ThirdParty/Clipper1
+      - path: Sources/WildOCRCore
+      - path: Sources/WildOCRAppleVision
+      - path: Sources/WildOCRPaddleBridge
+    info:
+      path: ios/WildOCRApp/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chenyu9512.wildocr.paddle
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: 'WILD_OCR_EMBEDDED WILD_OCR_PADDLE'
+        SWIFT_OBJC_BRIDGING_HEADER: 'ios/PaddleVendor/Supporting/PaddleOCRDemo-Bridging-Header.h'
+        HEADER_SEARCH_PATHS:
+          - '$(SRCROOT)/ios/PaddleVendor/Engine'
+          - '$(SRCROOT)/ios/PaddleVendor/ThirdParty/Clipper1'
+        CLANG_CXX_LANGUAGE_STANDARD: 'gnu++17'
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: 'NO'

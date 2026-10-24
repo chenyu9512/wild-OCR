@@ -1,0 +1,15 @@
+platform :ios, '17.0'
+project 'WildOCR.xcodeproj'
+target 'WildOCR' do
+  use_frameworks!
+  pod 'onnxruntime-objc', '~> 1.24'
+  pod 'Yams', '~> 5.0'
+  pod 'OpenCV', '~> 4.3.0'
+end
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |configuration|
+      configuration.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+    end
+  end
+end
