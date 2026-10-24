@@ -14,6 +14,12 @@ public enum ScriptClassifier {
         let total = counts.values.reduce(0, +)
         // Latin words within a predominantly Japanese/Korean sentence should
         // not force the entire block into a multilingual model.
+        // Kana and Han together normally indicate Japanese, not a mixed
+        // script failure. Keep Latin/etc truly distinct.
+        if counts[.kana, default: 0] > 0 && counts[.han, default: 0] > 0 &&
+           counts.filter({ $0.key != .kana && $0.key != .han }).values.reduce(0, +) < 3 {
+            return .kana
+        }
         let competing = counts.filter { $0.key != most.key && $0.value >= 3 }
             .values.reduce(0, +)
         if competing >= 3 && Double(competing) / Double(total) >= 0.25 {
